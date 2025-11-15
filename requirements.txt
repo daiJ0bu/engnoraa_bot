@@ -1,5 +1,5 @@
 pyTelegramBotAPI==4.14.0
-aiogram
+aiogram==3.13.1
 requests
 flask
 gunicorn
