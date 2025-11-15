@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher, types
 import asyncio
 import os
 
-TOKEN = os.environ.get("AAEiUDItp344S3MmFGQIzInVO_nnPwhDSjs")  
+TOKEN = os.environ.get("TELEGRAM_TOKEN")  # ENV variable nomi
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 app = Flask(__name__)
