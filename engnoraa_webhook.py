@@ -65,10 +65,20 @@ def home():
 
 # Webhook endpoint
 @app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     try:
-        update = types.Update.model_validate(request.get_json())
-        await dp.feed_update(bot, update)
+        update_data = request.get_json()
+        update = types.Update.model_validate(update_data)
+        
+        # Async funksiyani sync rejimda ishga tushirish
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        loop.run_until_complete(dp.feed_update(bot, update))
         return "OK", 200
     except Exception as e:
         logger.error(f"Error processing update: {e}")
