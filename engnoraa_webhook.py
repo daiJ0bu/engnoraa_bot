@@ -17,16 +17,14 @@ bot = Bot(
     token=TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
-
 dp = Dispatcher()
+
 app = Flask(__name__)
 
-# --- Home test route ---
 @app.route("/", methods=["GET"])
 def home():
     return "Engnoraa bot is running!"
 
-# --- Handler ---
 @dp.message()
 async def start(message: types.Message):
     if message.text == "/start":
@@ -45,7 +43,6 @@ async def start(message: types.Message):
             reply_markup=keyboard
         )
 
-# --- Webhook route ---
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = types.Update.de_json(request.get_json())
@@ -54,5 +51,4 @@ def webhook():
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 5000))
-    print(f"🌐 Running on port {PORT}")
     app.run(host="0.0.0.0", port=PORT)
