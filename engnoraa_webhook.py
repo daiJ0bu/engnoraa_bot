@@ -1,152 +1,89 @@
-# import os
-# import logging
-# from flask import Flask, request, jsonify
-# from aiogram import Bot, Dispatcher, types, F
-# from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-# from aiogram.enums import ParseMode
-# from aiogram.client.default import DefaultBotProperties
-# from aiogram.filters import CommandStart
-# from dotenv import load_dotenv
+import os
+import logging
+from flask import Flask, request
+import requests
 
-# # Logging
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# load_dotenv()
+# Config
+TOKEN = os.environ.get("TELEGRAM_TOKEN", "8175905001:AAEiUDItp344S3MmFGQIzInVO_nnPwhDSjs")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://engnoraa-bot.onrender.com")
 
-# TOKEN = os.environ.get("TELEGRAM_TOKEN")
-# WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+API_URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# if not TOKEN:
-#     raise Exception("❌ TELEGRAM_TOKEN topilmadi!")
-# if not WEBHOOK_URL:
-#     raise Exception("❌ WEBHOOK_URL topilmadi!")
+app = Flask(__name__)
 
-# # Bot
-# bot = Bot(
-#     token=TOKEN,
-#     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-# )
-# dp = Dispatcher()
+@app.route("/")
+def home():
+    return "✅ Engnoraa bot is running!", 200
 
-# # Flask
-# app = Flask(__name__)
-
-# # ✅ /start komandasi
-# @dp.message(CommandStart())
-# async def start_command(message: types.Message):
-#     keyboard = InlineKeyboardMarkup(
-#         inline_keyboard=[
-#             [
-#                 InlineKeyboardButton(
-#                     text="🌐 Open Engnoraa",
-#                     web_app=WebAppInfo(url="https://engnoraa.vercel.app")
-#                 )
-#             ]
-#         ]
-#     )
-#     await message.answer(
-#         "👋 Welcome to <b>Engnoraa English</b>!\n"
-#         "Learn, play and test your English 🌟",
-#         reply_markup=keyboard
-#     )
-#     logger.info(f"User {message.from_user.id} started the bot")
-
-# # ✅ Boshqa xabarlar
-# @dp.message(F.text)
-# async def other_messages(message: types.Message):
-#     await message.answer("ℹ️ Use /start to open the app")
-
-# # ✅ Health check
-# @app.route("/", methods=["GET"])
-# def home():
-#     return "✅ Engnoraa bot is running!", 200
-
-# # ✅ Webhook endpoint (SYNC versiya - Render uchun)
-# @app.route(f"/{TOKEN}", methods=["POST"])
-# def webhook():
-#     import asyncio
+@app.route("/setup")
+def setup():
+    """Webhook o'rnatish"""
+    webhook_url = f"{WEBHOOK_URL}/webhook"
     
-#     try:
-#         update_data = request.get_json()
-#         if not update_data:
-#             logger.error("Empty update received")
-#             return "Error: Empty update", 400
-        
-#         update = types.Update.model_validate(update_data)
-#         logger.info(f"Received update: {update.update_id}")
-        
-#         # Async funksiyani sync rejimda ishga tushirish
-#         try:
-#             loop = asyncio.get_event_loop()
-#         except RuntimeError:
-#             loop = asyncio.new_event_loop()
-#             asyncio.set_event_loop(loop)
-        
-#         loop.run_until_complete(dp.feed_update(bot, update))
-        
-#         return "OK", 200
-        
-#     except Exception as e:
-#         logger.error(f"Error processing update: {e}", exc_info=True)
-#         return jsonify({"error": str(e)}), 500
+    # Eski webhook o'chirish
+    requests.post(f"{API_URL}/deleteWebhook")
+    
+    # Yangi webhook
+    response = requests.post(
+        f"{API_URL}/setWebhook",
+        json={"url": webhook_url}
+    )
+    
+    result = response.json()
+    logger.info(f"Webhook setup: {result}")
+    return result, 200
 
-# # ✅ Webhook info (debug uchun)
-# @app.route("/webhook-info", methods=["GET"])
-# def webhook_info():
-#     import asyncio
-    
-#     try:
-#         loop = asyncio.get_event_loop()
-#     except RuntimeError:
-#         loop = asyncio.new_event_loop()
-#         asyncio.set_event_loop(loop)
-    
-#     info = loop.run_until_complete(bot.get_webhook_info())
-    
-#     return jsonify({
-#         "url": info.url,
-#         "has_custom_certificate": info.has_custom_certificate,
-#         "pending_update_count": info.pending_update_count,
-#         "last_error_date": info.last_error_date,
-#         "last_error_message": info.last_error_message,
-#         "max_connections": info.max_connections
-#     })
+@app.route("/info")
+def info():
+    """Webhook info"""
+    response = requests.get(f"{API_URL}/getWebhookInfo")
+    return response.json(), 200
 
-# # ✅ Webhook o'rnatish
-# def setup_webhook():
-#     import asyncio
-    
-#     webhook_url = f"{WEBHOOK_URL}/{TOKEN}"
-    
-#     try:
-#         loop = asyncio.get_event_loop()
-#     except RuntimeError:
-#         loop = asyncio.new_event_loop()
-#         asyncio.set_event_loop(loop)
-    
-#     try:
-#         # Eski webhook o'chirish
-#         loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
-#         logger.info("🗑️ Old webhook deleted")
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    """Telegram'dan xabar qabul qilish"""
+    try:
+        update = request.get_json()
         
-#         # Yangi webhook o'rnatish
-#         loop.run_until_complete(bot.set_webhook(webhook_url))
-#         logger.info(f"✅ Webhook set: {webhook_url}")
+        # /start komandasi
+        if "message" in update and "text" in update["message"]:
+            chat_id = update["message"]["chat"]["id"]
+            text = update["message"]["text"]
+            
+            if text == "/start":
+                # Web App button
+                reply_markup = {
+                    "inline_keyboard": [[
+                        {
+                            "text": "🌐 Open Engnoraa",
+                            "web_app": {"url": "https://engnoraa.vercel.app"}
+                        }
+                    ]]
+                }
+                
+                # Javob yuborish
+                requests.post(
+                    f"{API_URL}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": "👋 Welcome to <b>Engnoraa English</b>!\nLearn, play and test your English 🌟",
+                        "parse_mode": "HTML",
+                        "reply_markup": reply_markup
+                    }
+                )
+                
+                logger.info(f"✅ User {chat_id} started bot")
         
-#         # Tekshirish
-#         info = loop.run_until_complete(bot.get_webhook_info())
-#         logger.info(f"📊 Webhook info: {info.url}")
+        return "OK", 200
         
-#     except Exception as e:
-#         logger.error(f"❌ Webhook setup failed: {e}")
-#         raise
+    except Exception as e:
+        logger.error(f"❌ Error: {e}")
+        return "Error", 500
 
-# if __name__ == "__main__":
-#     # Webhook o'rnatish
-#     setup_webhook()
-    
-#     # Flask server
-#     PORT = int(os.environ.get("PORT", 5000))
-#     logger.info(f"🚀 Starting server on port {PORT}")
-#     app.run(host="0.0.0.0", port=PORT)
+if __name__ == "__main__":
+    PORT = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=PORT)
