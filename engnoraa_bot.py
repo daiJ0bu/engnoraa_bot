@@ -3,25 +3,21 @@ import asyncio
 import logging
 from threading import Thread
 from flask import Flask
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart
-from dotenv import load_dotenv
 
 # Logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-if not TOKEN:
-    raise Exception("❌ TELEGRAM_TOKEN topilmadi!")
+# Token (Render'da environment variable'dan oqiladi)
+TOKEN = os.environ.get("TELEGRAM_TOKEN", "8175905001:AAEiUDItp344S3MmFGQIzInVO_nnPwhDSjs")
 
 # Bot
 bot = Bot(
@@ -30,18 +26,18 @@ bot = Bot(
 )
 dp = Dispatcher()
 
-# Flask (Render uchun kerak - uxlab qolmasligi uchun)
+# Flask (Render uxlamasligi uchun)
 app = Flask(__name__)
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-    return "✅ Engnoraa bot is running!", 200
+    return "✅ Engnoraa bot is running!"
 
-@app.route("/health", methods=["GET"])
+@app.route("/health")
 def health():
-    return {"status": "ok", "bot": "online"}, 200
+    return {"status": "ok"}
 
-# ✅ /start komandasi
+# /start komandasi
 @dp.message(CommandStart())
 async def start_command(message: types.Message):
     keyboard = InlineKeyboardMarkup(
@@ -61,35 +57,30 @@ async def start_command(message: types.Message):
         reply_markup=keyboard
     )
     
-    logger.info(f"✅ User {message.from_user.id} started the bot")
+    logger.info(f"✅ User {message.from_user.id} started bot")
 
-# ✅ Boshqa xabarlar
-@dp.message(F.text)
-async def other_messages(message: types.Message):
-    await message.answer("ℹ️ Use /start to open the app")
-
-# ✅ Bot ishga tushirish (alohida thread'da)
+# Bot ishga tushirish
 async def start_bot():
     try:
-        logger.info("🤖 Engnoraa bot started!")
-        bot_info = await bot.get_me()
-        logger.info(f"Bot: @{bot_info.username}")
+        # Webhook o'chirish (agar mavjud bo'lsa)
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("🗑️ Webhook deleted")
         
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        logger.info("🤖 Bot polling started!")
+        await dp.start_polling(bot)
     except Exception as e:
         logger.error(f"❌ Bot error: {e}")
 
 def run_bot():
-    """Bot'ni alohida thread'da ishga tushirish"""
     asyncio.run(start_bot())
 
 if __name__ == "__main__":
-    # Bot'ni background'da ishga tushirish
+    # Bot'ni background thread'da ishga tushirish
     bot_thread = Thread(target=run_bot, daemon=True)
     bot_thread.start()
+    logger.info("🚀 Bot thread started")
     
-    logger.info("🚀 Flask server starting...")
-    
-    # Flask serverni ishga tushirish
+    # Flask server
     PORT = int(os.environ.get("PORT", 5000))
+    logger.info(f"🌐 Flask running on port {PORT}")
     app.run(host="0.0.0.0", port=PORT)
