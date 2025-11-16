@@ -180,10 +180,13 @@ def setup():
     requests.post(f"{API_URL}/deleteWebhook", timeout=10)
     logger.info("🗑️ Old webhook deleted")
     
-    # Set new webhook
+    # Set new webhook with allowed_updates
     response = requests.post(
         f"{API_URL}/setWebhook",
-        json={"url": webhook_url},
+        json={
+            "url": webhook_url,
+            "allowed_updates": ["message", "callback_query"]  # ← BU MUHIM!
+        },
         timeout=10
     )
     
@@ -202,6 +205,7 @@ def webhook():
     """Handle webhook updates"""
     try:
         update = request.get_json()
+        logger.info(f"Received update: {update}")  # Debug log
         
         # Handle messages
         if "message" in update:
@@ -352,12 +356,15 @@ def webhook():
             elif data == "back":
                 send_message(chat_id, "🏠 <b>Main Menu</b>", get_main_menu())
             
-            # Answer callback query
-            requests.post(
-                f"{API_URL}/answerCallbackQuery",
-                json={"callback_query_id": callback["id"]},
-                timeout=5
-            )
+            # Answer callback query (MUST be called!)
+            try:
+                requests.post(
+                    f"{API_URL}/answerCallbackQuery",
+                    json={"callback_query_id": callback["id"]},
+                    timeout=5
+                )
+            except Exception as e:
+                logger.error(f"Failed to answer callback: {e}")
         
         return "OK", 200
         
